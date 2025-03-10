@@ -200,11 +200,9 @@ class ThudGame:
         return tile[None,]
 
     def dwarf_value_scalar(self):
-        print('dwarfs count', (self.board == DWARF).sum())
         return (self.board == DWARF).sum() / 32
 
     def troll_value_scalar(self):
-        print('troll count', (self.board == TROLL).sum())
         return (self.board == TROLL).sum() * 4 / 32
 
     def scalar_to_tile(self, scalar, h: Optional[int] = None, w: Optional[int] = None):
@@ -438,7 +436,6 @@ class ThudGame:
         self.move_count += 1
         # Переключаем игрока после каждого хода
         self.current_player = 'troll' if self.current_player == 'dwarf' else 'dwarf'
-        print(np.sum(self.board == TROLL), np.sum(self.board == DWARF))
 
     def is_game_over(self):
         """

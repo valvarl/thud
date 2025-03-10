@@ -38,9 +38,6 @@ class ThudEnv(gym.Env):
     def _get_obs(self):
         import copy
         obs = self._game.observations(copy.deepcopy(self._pos_selected), self._h, self._w)
-        # print(obs.shape, obs.dtype, obs.min(), obs.max(), find_max_coords_np(obs))
-        # if obs.max() > 1:
-        #     print(obs[5])
         return {
             "obs": obs,
         }
@@ -70,22 +67,20 @@ class ThudEnv(gym.Env):
             self._pos_selected = (action // self._w, action % self._w)
         else:
             to_pos = (action // self._w, action % self._w)
-            print('STEP:', self._pos_selected, to_pos)
-            import copy
-            self._game.make_move(copy.deepcopy(self._pos_selected), to_pos)
+            self._game.make_move((int(self._pos_selected[0]), int(self._pos_selected[1])), to_pos)
             self._player_to_move = Player((self._player_to_move.value + 1) % 2)
             self._pos_selected = None
         
         terminated = self._game.is_game_over()
         truncated = False
         reward = 0
-        # if terminated:
-        #     dwarf_count = np.sum(self._game.board == 1)
-        #     troll_count = np.sum(self._game.board == 2)
-        #     if player == Player.DWARF:
-        #         reward = dwarf_count - 4 * troll_count
-        #     else:
-        #         reward = 4 * troll_count - dwarf_count
+        if terminated:
+            dwarf_count = np.sum(self._game.board == 1)
+            troll_count = np.sum(self._game.board == 2)
+            if player == Player.DWARF:
+                reward = dwarf_count - 4 * troll_count
+            else:
+                reward = 4 * troll_count - dwarf_count
 
         observation = self._get_obs()
         info = self._get_info()
@@ -98,7 +93,6 @@ gym.register(
 )
 
 def apply_masked_softmax(logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    # print(logits.shape)
     batch_size, rows, cols = logits.shape
     policy = F.softmax(logits.view(batch_size, -1), dim=1)
     policy *= mask.view(batch_size, -1)
@@ -117,12 +111,9 @@ def find_max_coords_np(matrix: np.ndarray) -> tuple[int, int]:
 
 
 def rollout_policy(obs):
-    print(obs.shape)
     logits = torch.randn(15, 15)
     units_legal = obs[5]
     move_legal = obs[6]
-    # print('units_legal\n',units_legal)
-    # print('move_legal\n',move_legal)
     if move_legal.sum().item() == 0:
         logits = apply_masked_softmax(logits[None,], units_legal[None,])
     else:
@@ -133,12 +124,9 @@ def rollout_policy(obs):
     }
 
 def rollout_policy_parallel(obs):
-    print(obs.shape)
     logits = torch.randn(obs.size(0), 15, 15)
     units_legal = obs[:, 5]
     move_legal = obs[:, 6]
-    # print('units_legal\n',units_legal)
-    # print('move_legal\n',move_legal)
     if move_legal.sum().item() == 0:
         logits = apply_masked_softmax(logits, units_legal)
     else:
@@ -147,7 +135,6 @@ def rollout_policy_parallel(obs):
     batched_poses = []
     for i in range(obs.size(0)):
         pos = find_max_coords(logits[i])
-        # print(i, pos[0].item(), pos[1].item())
         batched_poses.append(15 * pos[0] + pos[1])
     return {
         "action": torch.stack(batched_poses)[..., None]
@@ -155,11 +142,11 @@ def rollout_policy_parallel(obs):
 
 if __name__ == "__main__":
     env = torchrl.envs.GymEnv("gymnasium_env/ThudGame-v0")#, num_envs=1)
-    # env.reset()
-    # env.rollout(max_steps=10, policy=rollout_policy)
-    # td = env.rand_step()
+    env.reset()
+    env.rollout(max_steps=100, policy=rollout_policy)
+    td = env.rand_step()
     # print(td)
 
-    parallel_env = torchrl.envs.ParallelEnv(1, lambda env=env: env)
-    parallel_env.reset()
-    parallel_env.rollout(max_steps=10, policy=rollout_policy_parallel)
+    # parallel_env = torchrl.envs.ParallelEnv(2, lambda env=env: env)
+    # parallel_env.reset()
+    # parallel_env.rollout(max_steps=300, policy=rollout_policy_parallel)
